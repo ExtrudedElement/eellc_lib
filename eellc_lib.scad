@@ -180,13 +180,13 @@ module sample_hooks()
     linear_extrude(height = sample_height ) {
         difference(){
             make_hook();
-            hook_neg();
+            if (typ_h == 1) hook_neg();
         }
     }
     translate([s_h * 4.25,0,0]) linear_extrude(height = sample_height ) {
         difference(){
             make_hook();
-            hook_neg();
+            if (typ_h == 1) hook_neg();
         }
     }
 }
