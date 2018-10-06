@@ -1,8 +1,9 @@
 /**********************************************************/
 /*******************Extruded Element Library***************/
 /**********************************************************/
-//v1.0
-//Version date: 09/27/2018
+//v1.0_r
+//Version date: 10/06/2018
+//Purpose: Revision to enable cooler inserts to keep beverages cold and food dry
 /*
  *
  *Copyright (C) Extruded Element LLC. Extruded Element Library
@@ -15,31 +16,35 @@
  *U.S. Patent Pub. No.:US 2018/0272647 A1
  *U.S. Pub. Date: Sep. 27 2018
  *Appl. No.: 15/927,137
- *Publication found at uspto.gov
- *(via Patent Application Search)
+ *found at uspto.gov
  *
  *Learn more at extrudedelement.com
  */
 
-
+/*
+- Fix This: triangles are half the size & spacing that they should be (s_e = 50 and Triangle is only 25 on a side)
+- Added This: Fillet to center of Hexagonal LO element
+    - Fix This: Now add it to Square & Triangle
+- Fix This: Add Variables to .scad file so it can be used with Customizer GUI
+*/
 
 //Extruded Element Parameters
 
 /****Basic Options****/
 //
-typ_e = 1; //Element Types: typ_e, Input- [0,1, or 2]
+typ_e = 2; //Element Types: typ_e, Input- [0,1, or 2]
 ////0 - square element footprint; square LO array (rectangular grid)
 ////1 - triangle element footprint; hexagonal LO array (honeycomb)
 ////2 - hexagonal element footprint; triangular LO array (isogrid)
-s_e = 50; // element size (triangle or square side-length; hexagon flat-to-flat width/minor diameter)
+s_e = 2.52; // element size (triangle or square side-length; hexagon flat-to-flat width/minor diameter)
 /*******/
 typ_h =0; //Hook Types: typ_h, Input- [0 or 1]; Description-[square, rounded]
 ////0 - square hook (all 90 degree turns in hook profile)
 ////1 - rounded hook (Yin-Yang style tangencies, uniform hook width = tip diameter)
-s_h = 1; // hook size (width/diameter of arcing/squared hook profile-tip)
+s_h = .05; // hook size (width/diameter of arcing/squared hook profile-tip)
 /*******/
-n_elem = 9; // "x" (column) array size
-m_elem = 6; // "y" (row)    array size
+n_elem = 15; // "x" (column) array size
+m_elem = 8; // "y" (row)    array size
 /*******/
 e_fill = 0; //Element Fill Type: e_fill, [-1,0, or 1]
 //e_fill = -1; Filled Element minus Light Weighting Features (Edge to Edge Tiling Elements with Weight Reduction)
@@ -49,19 +54,19 @@ e_fill = 0; //Element Fill Type: e_fill, [-1,0, or 1]
 /****Production Options****....................................................*/
 /****Clearance/Fitment Options****/
 k_e = 0.9; // element kerf - decrease value to loosen fit (non-LO elements only)
-k_h = 0.9; // hook kerf - decrease value to loosen fit
+k_h = 0.94; // hook kerf - decrease value to loosen fit
 
 /****Production Dimensions****/
 sample_height = 4; //Extrusion height of sample elements for fitment/sheet production
-height = 100; //Extrusion height of Elements (must surpass object height for boolean intersection [Union of Object & Extruded Element Array])
+height = 4; //Extrusion height of Elements (must surpass object height for boolean intersection [Union of Object & Extruded Element Array])
 
 /****Production Spacing****/
-printer_spacing = s_e + 3 * s_h; //distance between printed elements on print bed
+printer_spacing = s_e + 5* s_h; //distance between printed elements on print bed
 
 /****Imported STL Object options****/
-fileName = "airfoil.stl"; // file name
+fileName = "SUP.stl"; // file name
 s_obj = 1; //scaling the original stl object file
-t_x = 0; // translate x
+t_x = 450; // translate x
 t_y = 0; // translate y
 t_z = 0; // translate z
 r_x = 0; //rotate about the +x axis
@@ -71,14 +76,22 @@ r_z = 0; //rotate about the +z axis
 
 /****Ligament-Only (LO) Options................................................*/
     //(Requires e_fill=0;)
-s_el = 0.5; //element ligament size (thickness); LO elements only
+s_el = .016; //element ligament size (thickness); LO elements only
 /*******Ligament-Only (LO) Supports*******/
+f_el = 0; //element ligament fillet: f_el [0 (no), 1 (yes)]
+r_fel = 1; //radius of ligament fillet
 c_h2e = 1; //Hook to element chamfer: c_h2e, [0 (no), 1 (yes)]
 t_h2e = 3; //hookbase-to-element taper size; LO elements only
 /*******/
-c_cscl = 1; //element center support chamfer ligaments: c_cscl, [0 (no), 1 (yes)]
-s_csc =  s_e  - 8*s_h; //element center support chamfer size; LO elements only
-s_csl = 0.5; //[<= s_scs] element center support chamfer ligament (thickness); LO elements only
+c_cscl = 0; //element center support chamfer ligaments: c_cscl, [0 (no), 1 (yes)]
+s_csc =  s_e ; //element center support chamfer size; LO elements only
+s_csl = 1; //[<= s_scs] element center support chamfer ligament (thickness); LO elements only
+////Cooler Elements 
+c_hol = 1; //hollow center [0 (no), 1 (yes)]
+r_chol = 2.630 / 2; //radius of hollow center hole (0.030" larger than can diameter)
+t_holrep = .016; //thickness of hollow replacement cylinder (here, ~ 2X nozzle diameter of .00787")
+ch_flow = 1; //bottom flow channels  [0 (no), 1 (yes)]
+r_chflow = 0.25; //radius of buttom flow channel
 
 
 
@@ -88,17 +101,20 @@ s_csl = 0.5; //[<= s_scs] element center support chamfer ligament (thickness); L
 //EXECUTED CODE
 
 ////////////////////////VISUALIZATION---------------------------
-tessellate(); //VISUALIZE 2D ELEMENT ARRAY
+
+
+//tessellate(); //VISUALIZE 2D ELEMENT ARRAY
 //intersection(){
-//   linear_extrude(height = height) tessellate(); //VISUALIZE 3D EXTRUDED ELEMENT ARRAY
-//   translate ([t_x,t_y,t_z]) rotate ([r_x,r_y,r_z]) scale ([s_obj, s_obj, s_obj]) import(fileName); //VISUALIZE OBJECT
+//linear_extrude(height = height) tessellate(); //VISUALIZE 3D EXTRUDED ELEMENT ARRAY
+ //  translate ([t_x,t_y,t_z]) rotate ([r_x,r_y,r_z]) scale ([s_obj, s_obj, s_obj]) import(fileName); //VISUALIZE OBJECT
 //}
 ///////////////////PRODUCTION TESTING---------------------------
 //sample_hooks(); //CREATE SOME SAMPLE HOOKS FOR PRINTING
-//sample_elements(); //CREATE SOME SAMPLE ELEMENTS FOR PRINTING
+sample_elements(); //CREATE SOME SAMPLE ELEMENTS FOR PRINTING
 
 
-///////////////////PRODUCTION-----------------------------------
+//
+/////////////////PRODUCTION-----------------------------------
 //production_iteration();
 
 //!//!END EXECUTED CODE!//!//
@@ -171,8 +187,31 @@ echo(i,j);
 //------Production Testing Modules------//
 module sample_elements()
 {
+    if (ch_flow == 0){
     linear_extrude(height = sample_height ) compile_element();
     linear_extrude(height = sample_height ) translate([printer_spacing,0,0]) compile_element();
+    }
+    if (ch_flow == 1){
+    difference(){
+        linear_extrude(height = sample_height ) compile_element();
+        place_flchan();
+    }
+    difference(){
+        linear_extrude(height = sample_height ) translate([printer_spacing,0,0]) compile_element();
+        translate([printer_spacing,0,0]) place_flchan();
+    }
+    }
+}
+
+module flow_channel()
+{
+    rotate([0,90,0]) linear_extrude(height = s_e) circle(r = r_chflow, $fn=50);
+}
+module place_flchan()
+{
+    if (typ_e == 2){
+        for(theta = [0 : 60 : 300]) rotate([0,0,theta]) flow_channel();
+    }
 }
 
 module sample_hooks()
@@ -180,13 +219,13 @@ module sample_hooks()
     linear_extrude(height = sample_height ) {
         difference(){
             make_hook();
-            if (typ_h == 1) hook_neg();
+            if (typ_e == 1) hook_neg();
         }
     }
     translate([s_h * 4.25,0,0]) linear_extrude(height = sample_height ) {
         difference(){
             make_hook();
-            if (typ_h == 1) hook_neg();
+            if (typ_e == 1) hook_neg();
         }
     }
 }
@@ -236,7 +275,19 @@ module tessellate() {
 //------Element Bulding Modules------//
 module compile_element() {
     if (e_fill == -1) light_weighting_element();
-    if (e_fill == 0) combine_hook_ligaments();
+    if (e_fill == 0 && c_hol == 0) combine_hook_ligaments();
+    if (e_fill == 0 && c_hol == 1) {
+            difference(){//take out center
+                combine_hook_ligaments();
+                circle(r = r_chol, $fn=50);
+            }
+            difference(){//replace with support cylinder
+                circle(r = r_chol + t_holrep, $fn=100);
+                circle(r = r_chol, $fn=100);
+            }
+    }
+    
+        
     if (e_fill == 1) combine_hook_element();
 }
 
@@ -336,15 +387,21 @@ module make_ligaments() {
     } 
     if(typ_e == 1){ //triangle (LO)
         for(theta = [60 : 120 : 300]) rotate([0,0,theta]) translate([-s_el/2,0,0]) square([s_el, s_e * r_min_tri - 1.5 * s_h - 2*(1 - k_h) * s_h],false);
-           if (c_cscl == 1) {//center support chamfer ligaments
-               for( theta = [90 : 120 : 340]) rotate ([0,0,theta]) translate([s_csc / (4 * sqrt(3)),0,0]) square([s_csl, s_csc/2],true);
-           } 
+       if (c_cscl == 1) {//center support chamfer ligaments
+           for( theta = [90 : 120 : 340]) rotate ([0,0,theta]) translate([s_csc / (4 * sqrt(3)),0,0]) square([s_csl, s_csc/2],true);
+       } 
     }
     if(typ_e == 2){ //hexagon (LO)
         for(theta = [0 : 60 : 300]) rotate([0,0,theta]) translate([-s_el/2,0,0]) square([s_el, 2 * s_e * r_min_tri - 1.5 * s_h - 2*(1 - k_h) * s_h ],false);
-           if (c_cscl == 1) {//center support chamfer ligaments
-               for( theta = [0 : 60 : 300]) rotate ([0,0,theta]) translate([3*s_csc / (4 * sqrt(3)),0,0]) square([s_csl, s_csc/2],true);
-           }
+       if (f_el == 1) {
+                   difference() {
+                       circle(r = sqrt(3) * (r_fel + s_el/2), $fn = 50);
+                       for( theta = [0 : 60 : 300]) rotate ([0,0,theta]) translate([2* (r_fel + s_el/2), 0, 0]) circle(r = r_fel, $fn = 50);
+                       }
+                   }
+       if (c_cscl == 1) {//center support chamfer ligaments
+           for( theta = [0 : 60 : 300]) rotate ([0,0,theta]) translate([3*s_csc / (4 * sqrt(3)),0,0]) square([s_csl, s_csc/2],true);
+       }
     }
 } 
 
